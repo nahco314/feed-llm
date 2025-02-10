@@ -75,4 +75,3 @@ def should_ignore(path: Path, ignore_patterns: list[str]) -> bool:
         if fnmatch.fnmatch(name, pattern):
             return True
     return False
-

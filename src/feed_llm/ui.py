@@ -276,7 +276,9 @@ class FileSelectionApp(App[None]):
             root_dir, saved_state=saved_state, ignore_patterns=ignore_patterns
         )
         self.selected_paths: list[Path] = []
-        self.save_state: bool = True  # True -> save new state on exit; False -> keep previous state
+        self.save_state: bool = (
+            True  # True -> save new state on exit; False -> keep previous state
+        )
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -325,6 +327,8 @@ def run_file_selection_app(
     :param ignore_patterns: Patterns to ignore.
     :return: (selected file paths, whether to save new state)
     """
-    app = FileSelectionApp(directory, saved_state=saved_state, ignore_patterns=ignore_patterns)
+    app = FileSelectionApp(
+        directory, saved_state=saved_state, ignore_patterns=ignore_patterns
+    )
     app.run()
     return app.selected_paths, app.save_state
