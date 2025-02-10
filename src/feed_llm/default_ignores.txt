@@ -1,0 +1,23 @@
+# Default ignore patterns for feed-llm
+# Lines starting with # are comments and are ignored.
+# Blank lines are also ignored.
+# Typical ephemeral or cache directories:
+__pycache__
+*.pyc
+*.pyo
+*.swp
+*.swo
+*.DS_Store
+.git
+.gitignore
+.hg
+.svn
+target
+node_modules
+dist
+build
+.idea
+.vscode
+
+# We also choose to ignore the feed-llm ignore file itself:
+.feed-llm-ignore

@@ -13,6 +13,7 @@ import os
 import sys
 
 import feed_llm.ui
+from feed_llm.ignore_manager import load_ignore_patterns
 
 # --- Module-level cache for the save directory ---
 _STATE_DIR: Path | None = None
@@ -97,9 +98,15 @@ def app_main(
     directory: str = ".",
     stdout: bool = False,
     format_: Literal["markdown", "xml"] = "markdown",
+    no_ignore: bool = False,
 ) -> None:
     """
     Main CLI entry point.
+
+    :param directory: Target directory to explore.
+    :param stdout: If True, print the final output to stdout. Otherwise copy to clipboard.
+    :param format_: Output format: "markdown" or "xml".
+    :param no_ignore: If True, do not apply ignore patterns.
     Uses the textual TUI for file selection, then outputs the selected files (formatted as text or binary placeholder).
     Also restores previous selection state (if available) and saves state on normal exit.
     If the user quits via ctrl+q, the saved state remains unchanged.
@@ -107,14 +114,16 @@ def app_main(
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     target_dir = Path(directory)
 
-    # Load previous state (if any) from the dedicated save directory.
+    # Load previous state (if any).
     previous_state = _load_state(target_dir)
 
-    # Run the TUI to get selected file paths, passing in the saved state.
-    # The TUI returns a tuple: (selected_paths, save_flag)
+    # Load ignore patterns (unless no_ignore is True).
+    ignore_patterns = load_ignore_patterns(target_dir, no_ignore=no_ignore)
+
+    # Run the TUI to get selected file paths, passing in the saved state & ignore patterns.
     try:
         selected_paths, save_flag = feed_llm.ui.run_file_selection_app(
-            target_dir, saved_state=previous_state
+            target_dir, saved_state=previous_state, ignore_patterns=ignore_patterns
         )
     except KeyboardInterrupt:
         return
@@ -163,8 +172,6 @@ def app_main(
     # --- Save state only on normal exit (via 'q') ---
     if save_flag:
         _save_state(target_dir, selected_paths)
-    else:
-        pass
 
 
 def _is_text_file(path: Path, read_bytes: int = 1024) -> bool:
@@ -200,6 +207,11 @@ def _read_file_content(path: Path) -> str:
 
 
 def main():
+    """
+    Register the CLI using cyclopts.
+    Example usage:
+      feed-llm --directory my_project --format markdown --no-ignore
+    """
     cyclopts.run(app_main)
 
 

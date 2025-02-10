@@ -1,7 +1,7 @@
 """Textual-based TUI for selecting files and directories. All comments in English."""
 
 from __future__ import annotations
-from typing import Dict
+from typing import Dict, List
 
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
@@ -15,6 +15,8 @@ from rich.text import Text
 from rich.style import Style
 import logging
 from pathlib import Path
+
+from feed_llm.ignore_manager import should_ignore
 
 # Define three selection states:
 # 0 = not selected, 1 = partially selected, 2 = fully selected
@@ -42,15 +44,23 @@ class FileSelectionTree(Tree[str]):
     prefix_click_width = 4  # Characters from the line start used for "[ ] " area.
     click_field_width = 3  # Number of characters to consider for clicking.
 
-    def __init__(self, root_dir: Path, saved_state: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        root_dir: Path,
+        saved_state: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+    ) -> None:
         """
         Initialize the tree.
+
         :param root_dir: Starting directory.
         :param saved_state: Optional list of relative file paths to pre-select.
+        :param ignore_patterns: Glob-like patterns for ignoring certain files/dirs.
         """
         super().__init__("File Selection")
         self.root_dir = root_dir
-        self.saved_state = saved_state
+        self.saved_state = saved_state or []
+        self.ignore_patterns = ignore_patterns or []
         self.node_to_path: dict[TextualTreeNode, Path] = {}
         self.node_to_depth: dict[TextualTreeNode, int] = {}
         self.path_to_node: dict[Path, TextualTreeNode] = {}
@@ -66,12 +76,11 @@ class FileSelectionTree(Tree[str]):
         self.cursor_line = 0
 
         # --- Restore saved state (if provided) ---
-        if self.saved_state:
-            for rel_path in self.saved_state:
-                abs_path = self.root_dir / rel_path
-                if abs_path in self.path_to_node:
-                    self.set_path_state(abs_path, 2)
-                    self.path_to_node[abs_path].refresh()
+        for rel_path in self.saved_state:
+            abs_path = self.root_dir / rel_path
+            if abs_path in self.path_to_node:
+                self.set_path_state(abs_path, 2)
+                self.path_to_node[abs_path].refresh()
 
     def _build_tree(
         self, parent_node: TextualTreeNode, directory: Path, depth: int = 0
@@ -79,6 +88,7 @@ class FileSelectionTree(Tree[str]):
         """
         Recursively build the tree from a directory.
         Directories are labeled "[D] name", files "[F] name".
+        Ignored paths are simply not added to the tree.
         """
         self.path_to_state[directory] = 0
         self.node_to_path[parent_node] = directory
@@ -90,26 +100,28 @@ class FileSelectionTree(Tree[str]):
         except (PermissionError, FileNotFoundError):
             return
 
+        # Filter out ignored items
+        entries = [e for e in entries if not should_ignore(e, self.ignore_patterns)]
+
         dirs = [e for e in entries if e.is_dir()]
         files = [e for e in entries if e.is_file()]
 
         for entry in dirs:
-            full_path = entry
             node_label = entry.name
             new_node = parent_node.add(node_label, expand=False, allow_expand=True)
-            self.path_to_state[full_path] = 0
-            self.node_to_path[new_node] = full_path
-            self.path_to_node[full_path] = new_node
+            self.path_to_state[entry] = 0
+            self.node_to_path[new_node] = entry
+            self.path_to_node[entry] = new_node
             self.node_to_depth[new_node] = depth + 1
-            self._build_tree(new_node, full_path, depth + 1)
+            # Recursively build children
+            self._build_tree(new_node, entry, depth + 1)
 
         for entry in files:
-            full_path = entry
             node_label = entry.name
             leaf_node = parent_node.add_leaf(node_label)
-            self.path_to_state[full_path] = 0
-            self.node_to_path[leaf_node] = full_path
-            self.path_to_node[full_path] = leaf_node
+            self.path_to_state[entry] = 0
+            self.node_to_path[leaf_node] = entry
+            self.path_to_node[entry] = leaf_node
             self.node_to_depth[leaf_node] = depth + 1
 
     def get_path_state(self, path: Path) -> int:
@@ -127,12 +139,18 @@ class FileSelectionTree(Tree[str]):
             self._propagate_state_to_children(path, state)
         if update_parent:
             self._update_parents(path)
-        self.path_to_node[path].refresh()
+        # Refresh the node (if it exists) to update the label
+        node = self.path_to_node.get(path)
+        if node is not None:
+            node.refresh()
 
     def _propagate_state_to_children(self, path: Path, state: int) -> None:
-        for child_path in path.iterdir():
-            if state in (0, 2) and child_path in self.path_to_state:
-                self.set_path_state(child_path, state, True, False)
+        try:
+            for child_path in path.iterdir():
+                if child_path in self.path_to_state and state in (0, 2):
+                    self.set_path_state(child_path, state, True, False)
+        except Exception:
+            pass  # In case of permission errors etc.
 
     def _update_parents(self, path: Path) -> None:
         parent_dir = path.parent
@@ -141,17 +159,24 @@ class FileSelectionTree(Tree[str]):
         if parent_dir in self.path_to_state:
             child_states = self._collect_child_states(parent_dir)
             if child_states and all(s == 2 for s in child_states):
-                self.set_path_state(parent_dir, 2, False)
+                self.set_path_state(parent_dir, 2, False, False)
             elif child_states and all(s == 0 for s in child_states):
-                self.set_path_state(parent_dir, 0, False)
+                self.set_path_state(parent_dir, 0, False, False)
             else:
-                self.set_path_state(parent_dir, 1, False)
+                self.set_path_state(parent_dir, 1, False, False)
+            node = self.path_to_node.get(parent_dir)
+            if node is not None:
+                node.refresh()
             self._update_parents(parent_dir)
 
     def _collect_child_states(self, parent_path: Path) -> list[int]:
         states = []
-        for entry in parent_path.iterdir():
-            states.append(self.path_to_state.get(entry, 0))
+        try:
+            for entry in parent_path.iterdir():
+                if entry in self.path_to_state:
+                    states.append(self.path_to_state[entry])
+        except Exception:
+            pass
         return states
 
     def toggle_selection(self, node: TextualTreeNode) -> None:
@@ -239,14 +264,19 @@ class FileSelectionApp(App[None]):
         Binding("ctrl+q", "abort_app", "Abort (do not save state)"),
     ]
 
-    def __init__(self, root_dir: Path, saved_state: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        root_dir: Path,
+        saved_state: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+    ) -> None:
         super().__init__()
         self.root_dir: Path = root_dir
-        self.file_tree: FileSelectionTree = FileSelectionTree(root_dir, saved_state)
-        self.selected_paths: list[Path] = []
-        self.save_state: bool = (
-            True  # True: save new state on exit; False: keep previous state
+        self.file_tree: FileSelectionTree = FileSelectionTree(
+            root_dir, saved_state=saved_state, ignore_patterns=ignore_patterns
         )
+        self.selected_paths: list[Path] = []
+        self.save_state: bool = True  # True -> save new state on exit; False -> keep previous state
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -275,18 +305,26 @@ class FileSelectionApp(App[None]):
     def _collect_selected_files(self) -> list[Path]:
         results: list[Path] = []
         for path, state in self.file_tree.path_to_state.items():
+            # If fully selected (2) and it's actually a file (not a dir)
             if state == 2 and not path.is_dir():
                 results.append(path)
         return results
 
 
 def run_file_selection_app(
-    directory: Path, saved_state: list[str] | None = None
+    directory: Path,
+    saved_state: list[str] | None = None,
+    ignore_patterns: list[str] | None = None,
 ) -> tuple[list[Path], bool]:
     """
     Instantiate and run FileSelectionApp.
     Returns a tuple: (list of selected file paths, save_state flag).
+
+    :param directory: Root directory to browse.
+    :param saved_state: Previously selected file paths (relative).
+    :param ignore_patterns: Patterns to ignore.
+    :return: (selected file paths, whether to save new state)
     """
-    app = FileSelectionApp(directory, saved_state=saved_state)
+    app = FileSelectionApp(directory, saved_state=saved_state, ignore_patterns=ignore_patterns)
     app.run()
     return app.selected_paths, app.save_state
