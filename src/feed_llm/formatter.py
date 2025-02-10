@@ -64,7 +64,9 @@ class XmlFormatter(FormatterStrategy):
         :param content: The text content of the file.
         :return: XML formatted string.
         """
-        escaped_content = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped_content = (
+            content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        )
         return f"<file path='{path}'>\n{escaped_content}\n</file>\n"
 
     def format_binary_file(self, path: Path) -> str:
