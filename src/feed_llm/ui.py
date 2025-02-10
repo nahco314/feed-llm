@@ -95,7 +95,7 @@ class FileSelectionTree(Tree[str]):
 
         for entry in dirs:
             full_path = entry
-            node_label = f"[D] {entry}"
+            node_label = entry.name
             new_node = parent_node.add(node_label, expand=False, allow_expand=True)
             self.path_to_state[full_path] = 0
             self.node_to_path[new_node] = full_path
@@ -105,7 +105,7 @@ class FileSelectionTree(Tree[str]):
 
         for entry in files:
             full_path = entry
-            node_label = f"[F] {entry}"
+            node_label = entry.name
             leaf_node = parent_node.add_leaf(node_label)
             self.path_to_state[full_path] = 0
             self.node_to_path[leaf_node] = full_path
@@ -173,8 +173,13 @@ class FileSelectionTree(Tree[str]):
     ) -> Text:
         path = self.node_to_path[node]
         state = self.path_to_state[path]
+        icon = "📂" if path.is_dir() else "📄"
         prefix = "[ ] " if state == 0 else "[x] " if state == 2 else "[-] "
-        return Text.assemble(prefix, node.label, style=style)
+        return Text.assemble(
+            prefix,
+            f"{icon} {node.label}",
+            style=style,
+        )
 
     async def _on_click(self, event: events.Click) -> None:
         async with self.lock:
