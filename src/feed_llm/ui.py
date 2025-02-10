@@ -274,17 +274,6 @@ class FileSelectionApp(App[None]):
                 results.append(path)
         return results
 
-    def on_tree_node_selected(self, event: Tree.NodeSelected[str]) -> None:
-        node = event.node
-        self.file_tree.toggle_selection(node)
-        self.file_tree.refresh(layout=True)
-
-    def on_tree_node_expanded(self, event: Tree.NodeExpanded[str]) -> None:
-        self.file_tree.refresh(layout=True)
-
-    def on_tree_node_collapsed(self, event: Tree.NodeCollapsed[str]) -> None:
-        self.file_tree.refresh(layout=True)
-
 
 def run_file_selection_app(
     directory: Path, saved_state: list[str] | None = None
