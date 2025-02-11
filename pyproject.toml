@@ -5,13 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "chardet>=5.2.0",
     "cyclopts>=3.5.1",
-    "markdown>=3.7",
-    "prompt-toolkit>=3.0.50",
     "pyperclip>=1.9.0",
     "textual>=1.0.0",
-    "urwid>=2.6.16",
 ]
 
 [project.scripts]

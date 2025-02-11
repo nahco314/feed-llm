@@ -1,19 +1,15 @@
 """Textual-based TUI for selecting files and directories. All comments in English."""
 
 from __future__ import annotations
-from typing import Dict, List
 
 from textual.app import App, ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Static, Tree
 from textual.widgets.tree import TreeNode as TextualTreeNode
-from textual.widgets.tree import TreeNode
 from textual.binding import Binding
-from textual.reactive import reactive
 from textual import events
 from rich.text import Text
 from rich.style import Style
-import logging
 from pathlib import Path
 
 from feed_llm.ignore_manager import should_ignore
