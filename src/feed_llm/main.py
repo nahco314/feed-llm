@@ -19,6 +19,9 @@ from feed_llm.ignore_manager import load_ignore_patterns
 _STATE_DIR: Path | None = None
 
 
+app = cyclopts.App(name="feed-llm")
+
+
 # --- State persistence helper functions ---
 def _get_save_dir() -> Path:
     """
@@ -94,22 +97,21 @@ def _save_state(directory: Path, selected_paths: list[Path]) -> None:
 
 
 # --- Main Application Entry Point ---
+@app.default()
 def app_main(
     directory: str = ".",
+    /,
     stdout: bool = False,
     format_: Literal["markdown", "xml"] = "markdown",
     no_ignore: bool = False,
 ) -> None:
     """
-    Main CLI entry point.
+    A TUI-based file selection tool for feeding code to LLMs.
 
     :param directory: Target directory to explore.
     :param stdout: If True, print the final output to stdout. Otherwise copy to clipboard.
     :param format_: Output format: "markdown" or "xml".
     :param no_ignore: If True, do not apply ignore patterns.
-    Uses the textual TUI for file selection, then outputs the selected files (formatted as text or binary placeholder).
-    Also restores previous selection state (if available) and saves state on normal exit.
-    If the user quits via ctrl+q, the saved state remains unchanged.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     target_dir = Path(directory)
@@ -212,7 +214,7 @@ def main():
     Example usage:
       feed-llm --directory my_project --format markdown --no-ignore
     """
-    cyclopts.run(app_main)
+    app()
 
 
 if __name__ == "__main__":
