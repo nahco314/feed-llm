@@ -10,7 +10,7 @@
   Utilizes [Textual](https://github.com/Textualize/textual) to provide a text-based user interface for browsing directories and selecting files. You can use the mouse or keyboard to navigate.
 
 - **Markdown or XML Formatting**  
-  Choose between Markdown or XML output. Binary files are represented with a placeholder instead of actual content.
+  Choose between Markdown or XML output. Binary files are represented with a placeholder by default, but can optionally be shown as text.
 
 - **Persistent State**  
   Remembers previously selected files within a given directory, so you can continue where you left off.
@@ -31,7 +31,7 @@ pip install feed-llm@git+https://github.com/nahco314/feed-llm
 ## Usage
 
 ```bash
-feed-llm [PATH] [--stdout] [--format <markdown|xml>] [--no-ignore]
+feed-llm [PATH] [--stdout] [--format <markdown|xml>] [--no-ignore] [--show-binary]
 ```
 
 ### CLI Options
@@ -47,6 +47,9 @@ feed-llm [PATH] [--stdout] [--format <markdown|xml>] [--no-ignore]
 
 - **`--no-ignore`**  
   If set, none of the ignore patterns in `default_ignores.txt` or `.feed-llm-ignore` will be applied.
+
+- **`--show-binary`**  
+  If set, attempts to show binary files as text instead of using placeholders.
 
 ### Navigating the TUI
 

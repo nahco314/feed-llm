@@ -104,6 +104,7 @@ def app_main(
     stdout: bool = False,
     format_: Literal["markdown", "xml"] = "markdown",
     no_ignore: bool = False,
+    show_binary: bool = False,
 ) -> None:
     """
     A TUI-based file selection tool for feeding code to LLMs.
@@ -112,6 +113,7 @@ def app_main(
     :param stdout: If True, print the final output to stdout. Otherwise copy to clipboard.
     :param format_: Output format: "markdown" or "xml".
     :param no_ignore: If True, do not apply ignore patterns.
+    :param show_binary: If True, attempt to show binary files as text instead of using placeholders.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     target_dir = Path(directory)
@@ -147,9 +149,12 @@ def app_main(
     warn_binary_paths: list[Path] = []
 
     for path in selected_paths:
-        if _is_text_file(path):
+        if _is_text_file(path) or show_binary:
             content = _read_file_content(path)
             formatted_files.append(formatter.format_text_file(path, content))
+            # Still warn about binary files even when showing them as text
+            if not _is_text_file(path):
+                warn_binary_paths.append(path)
         else:
             warn_binary_paths.append(path)
             formatted_files.append(formatter.format_binary_file(path))
